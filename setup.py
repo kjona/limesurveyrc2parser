@@ -12,7 +12,9 @@ setup(
     test_suite="tests",
     include_package_data=True,
     license="Apache",
-    install_requires=[],
+    install_requires=[
+        "pydash"
+    ],
     keywords="limesurvey api remote control parser",
     classifiers=[
         "Development Status :: 3 - Alpha",

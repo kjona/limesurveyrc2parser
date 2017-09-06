@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-import requests
-import pydash
 import re
+import pydash
 
 
 class LimeSurveyRc2PhpSourceParser(object):
@@ -55,7 +54,7 @@ class LimeSurveyRc2PhpSourceParser(object):
     def get_function_description(cls, doc_func_param_match_result):
         match_doc, match_name, match_signature = doc_func_param_match_result
         # print(match_signature)
-        if (re.findall("protected", match_doc)):
+        if re.findall("protected", match_doc):
             pass
             # print("\n\nFUNCTION %s\n" % match_name)
             # print(clean_doc(match_doc))
@@ -74,11 +73,16 @@ class LimeSurveyRc2PhpSourceParser(object):
         "$sSessionKey, $iSurveyID,  $docType='pdf'
         to a list of dicts
         [{
-          "name": "$sSessionKey"
+          "name": "$sSessionKey",
+          "py_name": "session_key",
+          "type": "s"
         },{
-          "name": "$iSurveyID"
+          "name": "$iSurveyID",
+          "py_name": "survey_id",
+          "type": "i"
         },{
-          "name": "$docType"
+          "name": "$docType",
+          "py_name": "doc_type",
           "default": "pdf"
         }
         :param php_signature: PHP signature
@@ -87,12 +91,12 @@ class LimeSurveyRc2PhpSourceParser(object):
         php_parameters = [p.strip() for p in php_signature.split(",")]
         result = []
         for php_parameter in php_parameters:
-            match = cls.RE_SIGNATURE_PARAMETER.match(php_parameter)
-            if not match:
+            m = cls.RE_SIGNATURE_PARAMETER.match(php_parameter)
+            if not m:
                 raise ValueError(
                     "Parameter '%s' has not the expected structure "
                     "of a PHP function parameter." % php_parameter)
-            php_name, default = match[1].strip(), match[3]
+            php_name, default = m[1].strip(), m[3]
             details = cls.get_details_from_php_variable(php_name)
             if default:
                 details['default'] = cls.get_py_default_from_php_default(
@@ -112,18 +116,30 @@ class LimeSurveyRc2PhpSourceParser(object):
           "type": "s"
         }
         """
+        php_variable_stripped = \
+            php_variable[1:] if php_variable[0] == "$" else php_variable
         # See, if we have some $iRowCount or similar PHP variable name
-        hungarian_match = re.match('\$([a-z])([A-Z].+)', php_variable)
+        hungarian_match = re.match('([a-z])([A-Z].+)', php_variable_stripped)
         if hungarian_match:
             typ = hungarian_match.group(1)
+            name = hungarian_match.group(2)
             return {
                 "name": php_variable,
-                "typ": typ
+                "py_name": cls.get_py_name_from_php_name(name),
+                "type": typ
             }
         else:
             return {
-                "name": php_variable
+                "name": php_variable,
+                "py_name": cls.get_py_name_from_php_name(php_variable_stripped)
             }
+
+    @staticmethod
+    def get_py_name_from_php_name(php_name):
+        # Prior to snake_casing the name, we have to handle some special cases
+        # groupIDs would be converted to "group_i_ds"
+        name = php_name.replace("IDs", "Ids")
+        return pydash.snake_case(name)
 
     @staticmethod
     def get_py_default_from_php_default(php_default, typ=None):
@@ -149,8 +165,8 @@ class LimeSurveyRc2PhpSourceParser(object):
             try:
                 value = int(value)
                 return value
-            except ValueError as e:
-                pass  # Upps, this wasn't an integer
+            except ValueError:
+                pass  # this wasn't an integer
             return value  # return string value
         # catch all case
         return php_default
