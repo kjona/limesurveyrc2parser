@@ -13,8 +13,15 @@ setup(
     include_package_data=True,
     license="Apache",
     install_requires=[
+        "requests",
         "pydash"
     ],
+    entry_points={
+        "console_scripts": [
+            "lsrc2download=script:download",
+            "lsrc2generatepy=script:generate_python_code"
+        ]
+    },
     keywords="limesurvey api remote control parser",
     classifiers=[
         "Development Status :: 3 - Alpha",

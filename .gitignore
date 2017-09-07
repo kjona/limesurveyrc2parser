@@ -102,3 +102,7 @@ ENV/
 
 # IDE
 .idea
+
+# source code files
+lsrc2source.php
+lsrc2client.py
