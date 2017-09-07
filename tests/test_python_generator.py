@@ -15,3 +15,13 @@ class TestPythonGenerate(object):
         ]
 
         SourceGenerator.generate(parse_result)
+
+    def test_generate_real(self):
+        with open('resource/lsrc2source.php') as f:
+            php_source = f.read()
+        parse_result = pkg.LimeSurveyRc2PhpSourceParser.parse(php_source)
+        py_source = SourceGenerator.generate(parse_result)
+        print(py_source)
+
+    def test_get_fct_doc(self):
+        SourceGenerator.get_fct_doc(doc='')
