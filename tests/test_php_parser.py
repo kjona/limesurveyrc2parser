@@ -5,8 +5,64 @@ from .context import limesurveyrc2parser as pkg
 Parser = pkg.LimeSurveyRc2PhpSourceParser
 
 
-class TestParse(object):
+class TestPhpParser(object):
+
+    def test_match_php_function_re_array_default(self):
+        """
+        Apply RegEx to determine documentation, function name, and
+        function signature. The signature contains a closing bracket.
+        :return:
+        """
+        re = Parser.RE_DOC_PUBLIC_FUNCTION_PARAM
+        match = re.findall("""/**
+* doc
+*/
+public function fct_name($overrideAll=Array(), $p2=1)
+{
+    ...
+}""")
+        assert len(match) == 1
+        assert match[0][0] == "\n* doc\n"
+        assert match[0][1] == "fct_name"
+        assert match[0][2] == "$overrideAll=Array(), $p2=1"
+
+    def test_match_php_function_re_two_functions(self):
+        """
+        Apply RegEx to determine documentation, function name, and
+        function signature for two functions
+        :return:
+        """
+        re = Parser.RE_DOC_PUBLIC_FUNCTION_PARAM
+        match = re.findall("""<?php
+class remotecontrol_handle
+{
+    /**
+    * fct1doc
+    */
+    public function fct1($parameter='foo', $overrideAll=Array(), $p2=1)
+    {
+        ...
+    }
+
+    /**
+    * fct2doc
+    */
+    public function fct2($iStart=1)
+    {
+        ...
+    }
+}""")
+        assert len(match) == 2
+        assert match[0][1] == "fct1"
+        assert match[0][2] == "$parameter='foo', $overrideAll=Array(), $p2=1"
+        assert match[1][1] == "fct2"
+        assert match[1][2] == "$iStart=1"
+
     def test_parse(self):
+        """
+        Full parse test
+        :return:
+        """
         php_source = """<?php
 class remotecontrol_handle
 {
@@ -28,7 +84,7 @@ class remotecontrol_handle
     * * remark 1 with slash /
     * @return string
     */
-    public function function_name($parameter='foo')
+    public function function_name($parameter='foo', $overrideAll=Array(), $p2=1)
     {
         ...
     }
@@ -37,11 +93,28 @@ class remotecontrol_handle
         assert len(r) == 1
         parsed_function_description = r[0]
         assert parsed_function_description["name"] == "function_name"
-        assert len(parsed_function_description["parameters"]) == 1
+        assert len(parsed_function_description["parameters"]) == 3
         parsed_function_parameter = parsed_function_description["parameters"][0]
         assert parsed_function_parameter["name"] == "$parameter"
         assert parsed_function_parameter["default"] == "foo"
         # print(json.dumps(r))
+
+    def test_extract_parameter_int_default(self):
+        r = Parser.extract_parameters("$iStart = 0")
+        assert r[0]['name'] == '$iStart'
+        assert r[0]['py_name'] == 'start'
+        assert r[0]['type'] == 'i'
+        assert r[0]['default'] == 0
+
+    def test_extract_parameter_array_default(self):
+        r = Parser.extract_parameters(
+            "$overrideAllConditions=Array(), $iEnd=10")
+        assert len(r) == 2
+        assert r[0]['name'] == '$overrideAllConditions'
+        assert r[0]['py_name'] == 'override_all_conditions'
+        assert 'type' not in r[0]
+        assert type(r[0]['default']) == dict
+        assert r[1]['name'] == '$iEnd'
 
     def test_extract_parameters(self):
         p1 = "$sSessionKey, $sImportData, $sImportDataType, " \

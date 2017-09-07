@@ -13,7 +13,7 @@ class LimeSurveyRc2PhpSourceParser(object):
         /\*\*(.+?)(?=\*/)\*/ # doc comment - will also match preceeding docs
         \s*
         public\ function\ ([^(]+)  # function name
-        \(([^)]+)\)                # parameters
+        \((.+?)\)$                   # parameters
         """, re.MULTILINE | re.VERBOSE | re.DOTALL)
 
     # simpler RE without doc string for validation purposes
@@ -23,7 +23,7 @@ class LimeSurveyRc2PhpSourceParser(object):
         """, re.MULTILINE | re.VERBOSE)
 
     # RE to match PHP signature
-    RE_SIGNATURE_PARAMETER = re.compile("([^=]+)(=(.+))?")
+    RE_SIGNATURE_PARAMETER = re.compile("([^=]+)(=\s*(.+))?")
 
     @classmethod
     def parse(cls, php_source):
@@ -98,9 +98,9 @@ class LimeSurveyRc2PhpSourceParser(object):
                     "of a PHP function parameter." % php_parameter)
             php_name, default = m[1].strip(), m[3]
             details = cls.get_details_from_php_variable(php_name)
-            if default:
+            if default is not None:
                 details['default'] = cls.get_py_default_from_php_default(
-                    default, details.get("typ", None))
+                    default, details.get("type", None))
             result.append(details)
         return result
 
@@ -145,10 +145,26 @@ class LimeSurveyRc2PhpSourceParser(object):
     def get_py_default_from_php_default(php_default, typ=None):
         php_default_map = {
             "NULL": None,
-            "null": None
+            "null": None,
+            "true": True,
+            "false": False,
+            "FALSE": False,
+            "array()": {},
+            "Array()": {}
         }
         if php_default in php_default_map:
             return php_default_map[php_default]
+
+        # Do we have type information?
+        if typ:
+            if typ == 'i':
+                return int(php_default)
+            elif typ == 's':
+                return php_default.strip("'")
+            else:
+                print("typ = %s: How to handle?" % typ)
+
+        # TODO: improve this TDD - align with above code
         # Handle strings
         if php_default[0] == "'" and php_default[-1] == "'":
             value = php_default[1:-1]
@@ -169,6 +185,8 @@ class LimeSurveyRc2PhpSourceParser(object):
                 pass  # this wasn't an integer
             return value  # return string value
         # catch all case
+        print("Unexpected php_default variant: type='%s', php_default='%s'" %
+              (typ, php_default))
         return php_default
 
     @staticmethod
