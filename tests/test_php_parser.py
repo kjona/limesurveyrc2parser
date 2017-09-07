@@ -116,6 +116,22 @@ class remotecontrol_handle
         assert type(r[0]['default']) == dict
         assert r[1]['name'] == '$iEnd'
 
+    def test_extract_parameter_type_from_doc(self):
+        r = Parser.extract_parameters(
+            "$noTypeInSig", doc="Blub\n@param string $noTypeInSig")
+        assert len(r) == 1
+        assert r[0]['name'] == '$noTypeInSig'
+        assert r[0]['py_name'] == 'no_type_in_sig'
+        assert r[0]['type'] == 's'
+
+    def test_extract_parameter_type_from_doc2(self):
+        r = Parser.extract_parameters(
+            "$iGroupID", doc="@param int $iGroupID")
+        assert len(r) == 1
+        assert r[0]['name'] == '$iGroupID'
+        assert r[0]['py_name'] == 'group_id'
+        assert r[0]['type'] == 'i'
+
     def test_extract_parameters(self):
         p1 = "$sSessionKey, $sImportData, $sImportDataType, " \
              "$sNewSurveyName=NULL, $DestSurveyID=NULL"

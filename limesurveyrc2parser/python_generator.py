@@ -91,10 +91,39 @@ class LimeSurveyRc2PythonSourceGenerator(object):
         # Add indent
         lines = [" " * indent + l for l in lines]
         py_doc = "\n".join(lines)
+        # Remove scope
+        py_doc = py_doc.replace(" " * indent + "@access public\n", "")
+        py_doc = py_doc.replace(" " * indent + "@return",
+                                " " * indent + ":return:")
         # Substitute parameters
         if parameters:
             for p in parameters:
-                # TODO: # 1. reformat parameter spec to sphinx/reST
+                # 1. reformat parameter spec to sphinx/reST
+                if p.get("type"):
+                    type2php_type_str = {
+                        "i": ["integer", "int"],
+                        "b": ["bool"],
+                        "s": ["string", "string|null"],
+                        "a": ["array", "struct", "array|null", "array|struct"],
+                        "d": ["string"]
+                    }
+                    type2py_type_str = {
+                        "i": "Integer",
+                        "b": "Boolean",
+                        "s": "String",
+                        "a": "OrderedDict",
+                        "d": "Date(as String ?)"
+                    }
+                    if p["type"] in type2php_type_str:
+                        py_type_str = type2py_type_str[p["type"]]
+                        for php_type_str in type2php_type_str[p["type"]]:
+                            search = "@param %s %s" % (php_type_str, p["name"])
+                            rep = \
+                                ":type %s: %s" % (p["py_name"], py_type_str) + \
+                                "\n" + \
+                                " " * indent + ":param %s:" % p["py_name"]
+                            py_doc = py_doc.replace(search, rep)
+
                 # last: replace it with the python name
                 py_doc = py_doc.replace(p["name"], p["py_name"])
         return py_doc

@@ -23,7 +23,7 @@ class LimeSurveyRc2PhpSourceParser(object):
         """, re.MULTILINE | re.VERBOSE)
 
     # RE to match PHP signature
-    RE_SIGNATURE_PARAMETER = re.compile("([^=]+)(=\s*(.+))?")
+    RE_SIGNATURE_PARAMETER = re.compile("([^=]+)\s*(=\s*(.+))?")
 
     @classmethod
     def parse(cls, php_source):
@@ -60,14 +60,19 @@ class LimeSurveyRc2PhpSourceParser(object):
             # print(clean_doc(match_doc))
             # print(match_signature)
 
+        doc = cls.clean_doc(match_doc)
+
         return {
             "name": match_name,
-            "parameters": cls.extract_parameters(match_signature),
-            "doc": cls.clean_doc(match_doc)
+            # doc is provided to extract parameters to determine the type
+            # based on the documentation (if no hungarian type notation is
+            # given)
+            "parameters": cls.extract_parameters(match_signature, doc),
+            "doc": doc
         }
 
     @classmethod
-    def extract_parameters(cls, php_signature):
+    def extract_parameters(cls, php_signature, doc=""):
         """
         converts a PHP signature, e.g.
         "$sSessionKey, $iSurveyID,  $docType='pdf'
@@ -86,6 +91,7 @@ class LimeSurveyRc2PhpSourceParser(object):
           "default": "pdf"
         }
         :param php_signature: PHP signature
+        :param doc: PHP documentation
         :return: list of dicts as described
         """
         php_parameters = [p.strip() for p in php_signature.split(",")]
@@ -97,7 +103,7 @@ class LimeSurveyRc2PhpSourceParser(object):
                     "Parameter '%s' has not the expected structure "
                     "of a PHP function parameter." % php_parameter)
             php_name, default = m[1].strip(), m[3]
-            details = cls.get_details_from_php_variable(php_name)
+            details = cls.get_details_from_php_variable(php_name, doc)
             if default is not None:
                 details['default'] = cls.get_py_default_from_php_default(
                     default, details.get("type", None))
@@ -105,12 +111,13 @@ class LimeSurveyRc2PhpSourceParser(object):
         return result
 
     @classmethod
-    def get_details_from_php_variable(cls, php_variable):
+    def get_details_from_php_variable(cls, php_variable, doc=""):
         """
         Takes a php_variable from a PHP function signature and returns an info
         dict.
 
         :param php_variable: e.g. $sSessionKey
+        :param doc: PHP documentation
         :return: e.g. {
           "name": "$sSessionKey",
           "type": "s"
@@ -125,20 +132,37 @@ class LimeSurveyRc2PhpSourceParser(object):
             name = hungarian_match.group(2)
             return {
                 "name": php_variable,
-                "py_name": cls.get_py_name_from_php_name(name),
+                "py_name": cls.get_py_name_from_php_name_stripped(name),
                 "type": typ
             }
         else:
+            doc_match = re.search(
+                "@param (\S*) " + php_variable.replace("$", "\\$"), doc)
+            php_doc_type2char = {
+                "string": "s",
+                "int": "i",
+                "integer": "i",
+                "bool": "b",
+                "array": "a"
+            }
             return {
                 "name": php_variable,
-                "py_name": cls.get_py_name_from_php_name(php_variable_stripped)
+                "py_name": cls.get_py_name_from_php_name_stripped(
+                    php_variable_stripped),
+                "type": php_doc_type2char.get(doc_match and doc_match[1])
             }
 
     @staticmethod
-    def get_py_name_from_php_name(php_name):
-        # Prior to snake_casing the name, we have to handle some special cases
+    def get_py_name_from_php_name_stripped(php_name_stripped):
+        # Prior to snake_casing the name, we have to handle some special cases:
+
+        # Missing uppercase letter in sformat
+        if php_name_stripped == "sformat":
+            return "format"
+
+        # bad CamelCase for IDS:
         # groupIDs would be converted to "group_i_ds"
-        name = php_name.replace("IDs", "Ids")
+        name = php_name_stripped.replace("IDs", "Ids")
         return pydash.snake_case(name)
 
     @staticmethod

@@ -24,4 +24,42 @@ class TestPythonGenerate(object):
         print(py_source)
 
     def test_get_fct_doc(self):
-        SourceGenerator.get_fct_doc(doc='')
+        """
+        Documentation generation:
+        - Remove @access information
+        - Rename @return
+        :return:
+        """
+        doc = """@access public
+@param string $sSessionKey Auth credentials
+@param integer $iSurveyID ID of the Survey where a token table will be created for
+@param array $aAttributeFields  An array of integer describing any additional attribute fields
+@return array Status=>OK when successful, otherwise the error description"""
+        parameters = [
+            {
+                "name": "$sSessionKey",
+                "py_name": "session_key",
+                "type": "s"
+            }, {
+                "name": "$iSurveyID",
+                "py_name": "survey_id",
+                "type": "i"
+            }, {
+                "name": "$aAttributeFields",
+                "py_name": "attribute_fields",
+                "type": "a"
+            }
+        ]
+        result = SourceGenerator.get_fct_doc(doc=doc,
+                                             parameters=parameters,
+                                             indent=1)
+        expected = """ \"\"\"
+ :type session_key: String
+ :param session_key: Auth credentials
+ :type survey_id: Integer
+ :param survey_id: ID of the Survey where a token table will be created for
+ :type attribute_fields: OrderedDict
+ :param attribute_fields:  An array of integer describing any additional attribute fields
+ :return: array Status=>OK when successful, otherwise the error description
+ \"\"\""""
+        assert expected == result
